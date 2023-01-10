@@ -1,0 +1,5 @@
+
+config = {
+    'device': 'cpu',
+    'basedir': '.'
+}
