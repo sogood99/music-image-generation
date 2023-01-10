@@ -1,2 +1,3 @@
 data/dataset.pickle
 venv
+**/__pycache__/
