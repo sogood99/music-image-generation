@@ -1,0 +1,13 @@
+torch
+torchvision
+tqdm
+numpy
+scipy
+scikit-learn
+scikit-image
+opencv-python
+pytorch_pretrained_biggan
+librosa
+matplotlib
+pandas
+tensorboard
