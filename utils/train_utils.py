@@ -7,11 +7,12 @@ from tqdm import tqdm
 from utils.config import config
 
 
-def train_model(net, train_loader, epochs=1, lr=0.001, train_type='sound'):
+def train_model(net, train_loader, epochs=1, lr=0.001, train_type='sound', offset=0):
     optimizer = optim.Adam(net.parameters(), lr=lr)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
     net.train()
 
-    for epoch in range(epochs):
+    for epoch in range(offset, offset+epochs):
         total_count = 0.0
         total_loss = 0.0
 
@@ -29,17 +30,19 @@ def train_model(net, train_loader, epochs=1, lr=0.001, train_type='sound'):
                 N = data.shape[0]
 
                 cond_target, noise_target = targets
-                cond_target = cond_target.view(N, -1).to(config['device'])
+                cond_target = cond_target.view(N).long().to(config['device'])
                 noise_target = noise_target.view(N, -1).to(config['device'])
 
             optimizer.zero_grad()
             outputs = net(data)
             if train_type == 'translator':
                 # output_cond, output_noise = outputs
+                criterion = torch.nn.CrossEntropyLoss()
                 output_cond = outputs
                 # loss = torch.sum((noise_target - output_noise) ** 2) + \
                 #     torch.sum((cond_target - output_cond) ** 2)
-                loss = torch.sum((cond_target - output_cond) ** 2)
+                # loss = torch.sum((cond_target - output_cond) ** 2)
+                loss = criterion(output_cond, cond_target)
             else:
                 loss = torch.sum((outputs - targets) ** 2)
 
@@ -48,7 +51,8 @@ def train_model(net, train_loader, epochs=1, lr=0.001, train_type='sound'):
 
             total_loss += loss.item()
             total_count += data.size(0)
-        print("Epoch loss = ", total_loss / total_count)
+        scheduler.step(total_loss/total_count)
+        print("Epoch {} loss = {}".format(epoch, total_loss / total_count))
 
 
 def eval_network(net, test_loader,  train_type='sound'):
@@ -66,11 +70,11 @@ def eval_network(net, test_loader,  train_type='sound'):
             targets = targets.view(-1, 2)
         elif train_type == 'translator':
             data = data.to(config['device'])
+            N = data.shape[0]
+
             cond_target, noise_target = targets
-            cond_target = cond_target.view(-1,
-                                           config['cond_size']).detach().cpu().numpy()
-            noise_target = noise_target.view(-1,
-                                             config['noise_size']).detach().cpu().numpy()
+            cond_target = cond_target.view(N).long().to(config['device'])
+            noise_target = noise_target.view(N, -1).to(config['device'])
 
             targets = cond_target
 
@@ -78,29 +82,24 @@ def eval_network(net, test_loader,  train_type='sound'):
 
         if train_type == 'translator':
             # cond_output, noise_output = outputs
-            cond_output = outputs
-            cond_output = cond_output.view(-1,
-                                           config['cond_size']).detach().cpu().numpy()
+            # cond_output = outputs
+            # cond_output = cond_output.view(-1,
+            #                                config['cond_size']).detach().cpu().numpy()
             # noise_output = noise_output.view(-1,
             #                                  config['noise_size']).detach().cpu().numpy()
 
-            outputs = cond_output
-        else:
-            predictions.append(outputs.detach().cpu().numpy())
-            eval_targets.append(targets.detach().cpu().numpy())
+            outputs = outputs.argmax(dim=1)
+        predictions.append(outputs.detach().cpu().numpy())
+        eval_targets.append(targets.detach().cpu().numpy())
 
-    if train_type != 'translator':
-        predictions = np.concatenate(predictions)
-        eval_targets = np.concatenate(eval_targets)
+    predictions = np.concatenate(predictions)
+    eval_targets = np.concatenate(eval_targets)
 
     if train_type == 'translator':
         # mse_noise = np.mean(np.sum((noise_output - noise_target) ** 2, axis=1))
-        mse_noise = 0
-        mse_cond = np.mean(np.sum((cond_output - cond_target) ** 2, axis=1))
-
-        print(mse_noise, mse_cond)
-
-        return mse_noise, mse_cond
+        acc = np.sum(predictions == eval_targets) / len(predictions)
+        print("Accuracy = ", 100 * acc)
+        return acc
     else:
 
         mse_arousal = np.mean((predictions[:, 0] - eval_targets[:, 0]) ** 2)

@@ -52,15 +52,13 @@ class NeuralTranslator(nn.Module):
         super(NeuralTranslator, self).__init__()
         self.fc1 = nn.Linear(input_size, 256)
         self.fc2 = nn.Linear(256, 1024)
-        self.fc3 = nn.Linear(1024, 4096)
-        self.fc4_cond = nn.Linear(4096, 59136)
+        self.fc3_cond = nn.Linear(1024, 248)
         # self.fc4_noise = nn.Linear(4096, 16384)
 
     def forward(self, x):
         out = F.relu(self.fc1(x))
         out = F.relu(self.fc2(out))
-        out = F.relu(self.fc3(out))
-        selected_cond = self.fc4_cond(out)
+        selected_cond = self.fc3_cond(out)
         # selected_noise = self.fc4_noise(out)
         # return (selected_cond, selected_noise)
         return selected_cond

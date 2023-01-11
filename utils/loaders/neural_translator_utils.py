@@ -21,7 +21,7 @@ def get_translator_data(dataset_path='./data/neural_translation_dataset.pickle')
 
 
 def get_classes():
-    df = pd.read_csv(os.join(config['basedir'], "data/oasis/OASIS.csv"))
+    df = pd.read_csv(os.path.join(config['basedir'], "data/oasis/OASIS.csv"))
     themes = df.Theme.to_numpy()
     themes = np.array(list(map(lambda s: s[:-2].strip(), themes)))
     prompts = np.unique(themes)
