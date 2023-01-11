@@ -2,6 +2,30 @@ import pickle
 from sklearn.cluster import KMeans
 import collections
 import numpy as np
+import pandas as pd
+import os
+from utils.config import config
+
+
+def get_translator_data(dataset_path='./data/neural_translation_dataset.pickle'):
+    with open(dataset_path, "rb") as f:
+        cond_vecs = pickle.load(f)
+        noise_vecs = pickle.load(f)
+        sent_vecs = pickle.load(f)
+
+    # Normalize sentiments similarly to the normalization performed for the audio model
+    sent_vecs = (sent_vecs - np.mean(sent_vecs, axis=0)) / \
+        np.std(sent_vecs, axis=0)
+
+    return cond_vecs, noise_vecs, sent_vecs
+
+
+def get_classes():
+    df = pd.read_csv(os.join(config['basedir'], "data/oasis/OASIS.csv"))
+    themes = df.Theme.to_numpy()
+    themes = np.array(list(map(lambda s: s[:-2].strip(), themes)))
+    prompts = np.unique(themes)
+    return prompts
 
 
 def select_class_per_cluster(cluster_idx, class_ids, n_clusters):
@@ -63,7 +87,6 @@ def smoothen_with_sub_classes(class_vecs, noise_vecs, sent_vecs, sub_classes=2):
     return class_vecs, noise_vecs, sent_vecs
 
 
-
 def get_gan_space_view_from_ids(dataset_path='../../data/neural_translation_dataset.pickle', selected_ids=None, n_sub_classes=5):
 
     # Load dataset
@@ -74,7 +97,8 @@ def get_gan_space_view_from_ids(dataset_path='../../data/neural_translation_data
     class_ids = class_vecs.argmax(1)
 
     # Normalize sentiments similarly to the normalization performed for the audio model
-    sent_vecs = (sent_vecs - np.mean(sent_vecs, axis=0)) / np.std(sent_vecs, axis=0)
+    sent_vecs = (sent_vecs - np.mean(sent_vecs, axis=0)) / \
+        np.std(sent_vecs, axis=0)
 
     idx = False
     for cur_id in selected_ids:
@@ -88,7 +112,6 @@ def get_gan_space_view_from_ids(dataset_path='../../data/neural_translation_data
                                                                   sub_classes=n_sub_classes)
 
     return class_vecs, noise_vecs, sent_vecs
-
 
 
 def get_gan_space_view(dataset_path='data/neural_translation_dataset.pickle', n_clusters=10, seed=1,
@@ -115,12 +138,14 @@ def get_gan_space_view(dataset_path='data/neural_translation_dataset.pickle', n_
     class_ids = class_vecs.argmax(1)
 
     # Normalize sentiments similarly to the normalization performed for the audio model
-    sent_vecs = (sent_vecs - np.mean(sent_vecs, axis=0)) / np.std(sent_vecs, axis=0)
+    sent_vecs = (sent_vecs - np.mean(sent_vecs, axis=0)) / \
+        np.std(sent_vecs, axis=0)
 
     # Cluster the sentiment space
     kmeans = KMeans(n_clusters=n_clusters)
     cluster_idx = kmeans.fit_predict(sent_vecs)
-    selected_classes = select_class_per_cluster(cluster_idx, class_ids, n_clusters)
+    selected_classes = select_class_per_cluster(
+        cluster_idx, class_ids, n_clusters)
 
     idx = False
     for cur_id in selected_classes:

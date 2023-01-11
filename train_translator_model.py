@@ -54,5 +54,5 @@ if __name__ == '__main__':
     # train_and_evaluate()
 
     # Create 5 views
-    for i in tqdm(range(20)):
+    for i in tqdm(range(5)):
         train_deploy(seed=i)

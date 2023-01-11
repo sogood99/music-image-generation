@@ -1,5 +1,5 @@
 from pytorch_pretrained_biggan import BigGAN
-from utils.gan_utils import feedforward_gan
+from utils.diffusion_utils import feedforward_gan
 from utils.video_utils import generate_video
 from time import time
 import subprocess
@@ -11,6 +11,7 @@ import numpy as np
 from utils.config import config
 from os.path import join
 import scipy
+
 
 class DeepSing:
 

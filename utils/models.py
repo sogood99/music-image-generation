@@ -50,17 +50,19 @@ class NeuralTranslator(nn.Module):
 
     def __init__(self, input_size=2):
         super(NeuralTranslator, self).__init__()
-        self.fc1 = nn.Linear(input_size, 64)
-        self.fc2 = nn.Linear(64, 256)
-        self.fc3_class = nn.Linear(256, 1000)
-        self.fc3_noise = nn.Linear(256, 128)
+        self.fc1 = nn.Linear(input_size, 256)
+        self.fc2 = nn.Linear(256, 1024)
+        self.fc3 = nn.Linear(1024, 4096)
+        self.fc4_cond = nn.Linear(4096, 59136)
+        self.fc4_noise = nn.Linear(4096, 16384)
 
     def forward(self, x):
         out = F.relu(self.fc1(x))
         out = F.relu(self.fc2(out))
-        selected_class = self.fc3_class(out)
-        selected_noise = self.fc3_noise(out)
-        return (selected_class, selected_noise)
+        out = F.relu(self.fc3(out))
+        selected_cond = self.fc4_cond(out)
+        selected_noise = self.fc4_noise(out)
+        return (selected_cond, selected_noise)
 
 
 def get_pretrained_mobile_net(pretrained=True):

@@ -26,17 +26,18 @@ def train_model(net, train_loader, epochs=1, lr=0.001, train_type='sound'):
                 targets = targets.view(-1, 2)
             elif train_type == 'translator':
                 data = data.to(config['device'])
-                class_target, noise_target = targets
-                class_target = class_target.to(config['device'])
-                noise_target = noise_target.to(config['device'])
+                N = data.shape[0]
+
+                cond_target, noise_target = targets
+                cond_target = cond_target.view(N, -1).to(config['device'])
+                noise_target = noise_target.view(N, -1).to(config['device'])
 
             optimizer.zero_grad()
             outputs = net(data)
             if train_type == 'translator':
-                output_class, output_noise = outputs
+                output_cond, output_noise = outputs
                 loss = torch.sum((noise_target - output_noise) ** 2) + \
-                    torch.sum(torch.sum(- class_target *
-                              F.log_softmax(output_class, dim=1), 1))
+                    torch.sum((cond_target - output_cond) ** 2)
             else:
                 loss = torch.sum((outputs - targets) ** 2)
 
@@ -63,24 +64,39 @@ def eval_network(net, test_loader,  train_type='sound'):
             targets = targets.view(-1, 2)
         elif train_type == 'translator':
             data = data.to(config['device'])
-            class_target, noise_target = targets
-            targets = class_target.argmax(dim=1)
+            cond_target, noise_target = targets
+            cond_target = cond_target.view(-1,
+                                           config['cond_size']).detach().cpu().numpy()
+            noise_target = noise_target.view(-1,
+                                             config['noise_size']).detach().cpu().numpy()
+
+            targets = cond_target
 
         outputs = net(data)
 
         if train_type == 'translator':
-            outputs = outputs[0].argmax(dim=1)
+            cond_output, noise_output = outputs
+            cond_output = cond_output.view(-1,
+                                           config['cond_size']).detach().cpu().numpy()
+            noise_output = noise_output.view(-1,
+                                             config['noise_size']).detach().cpu().numpy()
 
-        predictions.append(outputs.detach().cpu().numpy())
-        eval_targets.append(targets.detach().cpu().numpy())
+            outputs = cond_output
+        else:
+            predictions.append(outputs.detach().cpu().numpy())
+            eval_targets.append(targets.detach().cpu().numpy())
 
-    predictions = np.concatenate(predictions)
-    eval_targets = np.concatenate(eval_targets)
+    if train_type != 'translator':
+        predictions = np.concatenate(predictions)
+        eval_targets = np.concatenate(eval_targets)
 
     if train_type == 'translator':
-        acc = np.sum(predictions == eval_targets) / len(predictions)
-        print("Accuracy = ", 100 * acc)
-        return acc
+        mse_noise = np.mean(np.sum((noise_output - noise_target) ** 2, axis=1))
+        mse_cond = np.mean(np.sum((cond_output - cond_target) ** 2, axis=1))
+
+        print(mse_noise, mse_cond)
+
+        return mse_noise, mse_cond
     else:
 
         mse_arousal = np.mean((predictions[:, 0] - eval_targets[:, 0]) ** 2)
