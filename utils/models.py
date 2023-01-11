@@ -65,7 +65,7 @@ class NeuralTranslator(nn.Module):
 
 def get_pretrained_mobile_net(pretrained=True):
     if pretrained:
-        pretrained_net = mobilenet_v2(pretrained=True)
+        pretrained_net = mobilenet_v2(weights='DEFAULT')
 
     net = MobileNetV2(num_classes=2)
     if pretrained:
