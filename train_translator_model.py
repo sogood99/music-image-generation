@@ -36,6 +36,9 @@ def train_deploy(seed=1):
     net.to(config['device'])
 
     train_model(net, train_loader, epochs=200,
+                lr=0.01, train_type='translator')
+    eval_network(net, train_loader, train_type='translator')
+    train_model(net, train_loader, epochs=20,
                 lr=0.001, train_type='translator')
     eval_network(net, train_loader, train_type='translator')
     torch.save(net.state_dict(), "models/neural_translator_" +

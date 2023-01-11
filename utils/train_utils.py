@@ -35,9 +35,11 @@ def train_model(net, train_loader, epochs=1, lr=0.001, train_type='sound'):
             optimizer.zero_grad()
             outputs = net(data)
             if train_type == 'translator':
-                output_cond, output_noise = outputs
-                loss = torch.sum((noise_target - output_noise) ** 2) + \
-                    torch.sum((cond_target - output_cond) ** 2)
+                # output_cond, output_noise = outputs
+                output_cond = outputs
+                # loss = torch.sum((noise_target - output_noise) ** 2) + \
+                #     torch.sum((cond_target - output_cond) ** 2)
+                loss = torch.sum((cond_target - output_cond) ** 2)
             else:
                 loss = torch.sum((outputs - targets) ** 2)
 
@@ -75,11 +77,12 @@ def eval_network(net, test_loader,  train_type='sound'):
         outputs = net(data)
 
         if train_type == 'translator':
-            cond_output, noise_output = outputs
+            # cond_output, noise_output = outputs
+            cond_output = outputs
             cond_output = cond_output.view(-1,
                                            config['cond_size']).detach().cpu().numpy()
-            noise_output = noise_output.view(-1,
-                                             config['noise_size']).detach().cpu().numpy()
+            # noise_output = noise_output.view(-1,
+            #                                  config['noise_size']).detach().cpu().numpy()
 
             outputs = cond_output
         else:
@@ -91,7 +94,8 @@ def eval_network(net, test_loader,  train_type='sound'):
         eval_targets = np.concatenate(eval_targets)
 
     if train_type == 'translator':
-        mse_noise = np.mean(np.sum((noise_output - noise_target) ** 2, axis=1))
+        # mse_noise = np.mean(np.sum((noise_output - noise_target) ** 2, axis=1))
+        mse_noise = 0
         mse_cond = np.mean(np.sum((cond_output - cond_target) ** 2, axis=1))
 
         print(mse_noise, mse_cond)
