@@ -36,7 +36,7 @@ def train_deploy(seed=1):
     net.to(config['device'])
 
     train_model(net, train_loader, epochs=500,
-                lr=0.01, train_type='translator')
+                lr=0.001, train_type='translator')
     eval_network(net, train_loader, train_type='translator')
     train_model(net, train_loader, epochs=200,
                 lr=0.0001, train_type='translator', offset=500)
