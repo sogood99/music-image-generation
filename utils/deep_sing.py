@@ -4,7 +4,6 @@ from utils.video_utils import generate_video
 from time import time
 import subprocess
 from utils.video_utils import add_logo, add_debug_info
-from stylization_utils.stylizer import stylize_frames
 import cv2
 import json
 import numpy as np
@@ -138,9 +137,6 @@ class DeepSing:
 
         # Step 3: Optionally stylize the images
         stylizer_sentiments = []
-        if self.stylizer is not None:
-            stylizer_sentiments = stylize_frames(
-                images, self.stylizer, sentiment_predictions)
 
         # Step 4: Add DeepSing logo :P
         if self.logo is not None:
