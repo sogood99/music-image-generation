@@ -78,3 +78,22 @@ def get_pretrained_mobile_net(pretrained=True):
         net.load_state_dict(state_dict, strict=False)
 
     return net
+
+
+class CorrectionNet(nn.Module):
+    def __init__(self):
+        super(CorrectionNet, self).__init__()
+        self.fc1 = nn.Linear(59136, 1024)
+        self.fc2 = nn.Linear(59136, 1024)
+
+        self.fc3 = nn.Linear(2048, 2048)
+        self.fc4 = nn.Linear(2048, 59136)
+
+    def forward(self, x0, x1):
+        x0 = F.relu(self.fc1(x0))
+        x1 = F.relu(self.fc1(x1))
+        x = torch.cat((x0, x1), dim=1)
+
+        x = F.relu(self.fc3(x))
+        x = self.fc4(x)
+        return x

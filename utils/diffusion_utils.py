@@ -1,6 +1,6 @@
+import cv2
 import torch
 from tqdm import tqdm
-from utils.video_utils import torch_to_cv2
 from utils.config import config
 from PIL import Image
 from torch.nn import functional as F
@@ -10,6 +10,7 @@ from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from transformers import CLIPTextModel, CLIPTokenizer
 from tqdm.auto import tqdm
 from transformers import logging
+import numpy as np
 logging.set_verbosity_error()
 
 model_id = 'CompVis/stable-diffusion-v1-4'
@@ -131,44 +132,144 @@ def prompt_to_img(prompts, height=512, width=512, num_inference_steps=50,
 
     return imgs
 
+# interpolation method
 
-def feedforward_gan(model, class_vectors, noise_vectors, batch_size, truncation):
-    """
-    Feedd-fowards the GAN and creates a collection of images
-    :param model:
-    :param class_vectors:
-    :param noise_vectors:
-    :param batch_size:
-    :param class_ids:
-    :param truncation:
-    :return:
-    """
+
+def interpolateTextEmbed_linear(embed_1, embed_2, k):
+    embed_shape = embed_1.shape
+    v_interpolate = (1-k)*embed_1 + k*embed_2
+    return v_interpolate.view(embed_shape)
+
+
+def interpolateTextEmbed_square_correction(embed_1, embed_2, k, correction_model):
+    embed_shape = embed_1.shape
+    v_correction = correction_model(
+        embed_1[1].view(1, -1), embed_2[1].view(1, -1))
+    v_correction = torch.cat(
+        [embed_1[0][None, :], v_correction[None, :].view(1, *embed_shape[1:])], dim=0)
+    v_interpolate = (1-k)*embed_1 + k*embed_2 + 4*k*(1-k)*v_correction
+    return v_interpolate.view(embed_shape)
+
+
+def interpolateTextEmbed_linear_correction(embed_1, embed_2, k, correction_model):
+    embed_shape = embed_1.shape
+    v_correction = correction_model(
+        embed_1[1].view(1, -1), embed_2[1].view(1, -1))
+    v_correction = torch.cat(
+        [embed_1[0][None, :], v_correction[None, :].view(1, *embed_shape[1:])], dim=0)
+    if k < 0.5:
+        v_interpolate = (1-k)*embed_1 + k*embed_2 + 2*k*v_correction
+    else:
+        v_interpolate = (1-k)*embed_1 + k*embed_2 + 2*(1-k)*v_correction
+    return v_interpolate.view(embed_shape)
+
+
+def interpolateTextEmbed_sphere(embed_1, embed_2, k):
+    embed_shape = embed_1.shape
+    embed_1 = embed_1.view(1, -1)
+    embed_2 = embed_2.view(1, -1)
+
+    inner_product = (embed_1 * embed_2).sum(dim=1)
+    a_norm = embed_1.pow(2).sum(dim=1).pow(0.5)
+    b_norm = embed_2.pow(2).sum(dim=1).pow(0.5)
+    embed_angle = torch.acos(inner_product / (a_norm * b_norm))
+
+    v_interpolate = torch.sin((1-k)*embed_angle)/torch.sin(embed_angle) * embed_1 \
+        + torch.sin(k*embed_angle)/torch.sin(embed_angle) * embed_2
+    return v_interpolate.view(embed_shape)
+
+
+def interpolateLatentSpace_linear(latent_1, latent_2, k):
+    latent_shape = latent_1.shape
+    v_interpolate = (1-k) * latent_1 + k * latent_2
+    return v_interpolate.view(latent_shape)
+
+
+def interpolateLatentSpace_sqrt(latent_1, latent_2, k):
+    latent_shape = latent_1.shape
+    v_interpolate = np.sqrt(1-k) * latent_1 + np.sqrt(k) * latent_2
+    return v_interpolate.view(latent_shape)
+
+
+def interpolateLatentSpace_sphere(latent_1, latent_2, k):
+    latent_shape = latent_1.shape
+    latent_1 = latent_1.view(1, -1)
+    latent_2 = latent_2.view(1, -1)
+
+    inner_product = (latent_1 * latent_2).sum(dim=1)
+    a_norm = latent_1.pow(2).sum(dim=1).pow(0.5)
+    b_norm = latent_2.pow(2).sum(dim=1).pow(0.5)
+    latent_angle = torch.acos(inner_product / (a_norm * b_norm))
+
+    v_interpolate = torch.sin((1-k)*latent_angle)/torch.sin(latent_angle) * latent_1 \
+        + torch.sin(k*latent_angle)/torch.sin(latent_angle) * latent_2
+    return v_interpolate.view(latent_shape)
+
+
+def image_grid(imgs, rows, cols):
+    assert len(imgs) == rows*cols
+
+    w, h = imgs[0].size
+    grid = Image.new('RGB', size=(cols*w, rows*h))
+    grid_w, grid_h = grid.size
+
+    for i, img in enumerate(imgs):
+        grid.paste(img, box=(i % cols*w, i//cols*h))
+    return grid
+
+
+def images_to_video(images, fps, output_path):
+    h, w, c = np.array(images[0]).shape
+    frame_size = (h, w)
+
+    out = cv2.VideoWriter(output_path,
+                          cv2.VideoWriter_fourcc(*"DIVX"), 15, frame_size)
+
+    for img in images:
+        new_img = np.array(img)
+        out.write(cv2.cvtColor(new_img, cv2.COLOR_RGB2BGR))
+
+    out.release()
+
+
+def generate_video(prompts, unet, scheduler, vae, tokenizer, text_encoder, num_between=10):
+    # test out perturbing latent
+    num_inference_steps = 20
+    guidance_scale = 7.5
+
+    height, width = 512, 512
+
+    prompt_2 = [prompts[0]]
+    text_embed_2 = get_text_embeds(tokenizer, text_encoder, prompt_2)
+    latents_2 = torch.randn((text_embed_2.shape[0] // 2, unet.in_channels,
+                             height // 8, width // 8))
+
+    lmd = np.linspace(0, 1, num=num_between)
 
     images = []
-    n_batches = int(len(class_vectors) / batch_size)
+    # Text embeds -> img latents
 
-    print("Generating GAN content...")
-    for i in tqdm(range(n_batches)):
-        cur_noise = torch.from_numpy(
-            noise_vectors[i * batch_size:(i + 1) * batch_size]).to(config['device'])
-        cur_class = torch.from_numpy(
-            class_vectors[i * batch_size:(i + 1) * batch_size]).to(config['device'])
+    for it in range(1, len(prompts)):
+        prompt_1 = prompt_2
+        prompt_2 = [prompts[it]]
 
-        with torch.no_grad():
-            output = model(cur_noise, cur_class, truncation)
+        text_embed_1 = get_text_embeds(tokenizer, text_encoder, prompt_1)
+        text_embed_2 = get_text_embeds(tokenizer, text_encoder, prompt_2)
 
-        images.append(output.cpu().numpy())
+        latents_1 = latents_2
+        latents_2 = torch.randn((text_embed_2.shape[0] // 2, unet.in_channels,
+                                height // 8, width // 8))
 
-    if n_batches * batch_size < len(class_vectors):
-        cur_noise = torch.from_numpy(
-            noise_vectors[n_batches * batch_size:]).to(config['device'])
-        cur_class = torch.from_numpy(
-            class_vectors[n_batches * batch_size:]).to(config['device'])
+        for i, k in enumerate(lmd):
+            latents = produce_latents(unet, scheduler,
+                                      interpolateTextEmbed_linear(
+                                          text_embed_1, text_embed_2, k),
+                                      height=height, width=width,
+                                      num_inference_steps=num_inference_steps, guidance_scale=guidance_scale,
+                                      latents=interpolateLatentSpace_sphere(latents_1, latents_2, k))
 
-        with torch.no_grad():
-            output = model(cur_noise, cur_class, truncation)
-
-        images.append(output.cpu().numpy())
-
-    images = torch_to_cv2(images)
+            # Img latents -> imgs
+            imgs = decode_img_latents(vae, latents)
+            images += [imgs[0]]
+            print("Finished {:.3f} of {}".format((i+1)/num_between, it+1))
     return images

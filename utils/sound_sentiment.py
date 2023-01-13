@@ -20,7 +20,7 @@ class SoundSentimentExtractor:
         # Features are extracted every 0.5sec
         self.period = 0.5
 
-    def extract_sentiment(self, audio_path, subsample, smoothing_window):
+    def extract_sentiment(self, audio_path, smoothing_window):
         # Step 0: Load the file
         data, power_features = extract_features_from_file(audio_path)
 
@@ -30,22 +30,14 @@ class SoundSentimentExtractor:
 
         # Step 2: Down-sample and smooth the sentiment signal
         predictions_np = smooth_audio_sentiment(
-            predictions_np, subsample, smoothing_window)
+            predictions_np, smoothing_window)
         return predictions_np, power_features
 
 
-def smooth_audio_sentiment(sentiment_features, subsample=10, smoothing_window=0):
-
-    # Step 1.1: Perform average downsampling to reduce the frequency of the optical signal
-    n_samples = int(len(sentiment_features) / float(subsample)) * subsample
+def smooth_audio_sentiment(sentiment_features, smoothing_window=10):
+    n_samples = int(len(sentiment_features) /
+                    float(smoothing_window)) * smoothing_window
     sentiment_features = sentiment_features[:n_samples].reshape(
-        (-1, subsample, 2))
+        (-1, smoothing_window, 2))
     sentiment_features = np.mean(sentiment_features, 1)
-
-    # Step 1.2: Perform smoothing by taking sliding average windows (enrich in-class variations)
-    if smoothing_window > 0:
-        for i in range(0, len(sentiment_features), smoothing_window):
-            sentiment_features[i:i + smoothing_window] = np.mean(
-                sentiment_features[i:i + smoothing_window], axis=0)
-        # predictions_np[:, 0] = np.convolve(predictions_np[:, 0], np.ones((smoothing,)) / smoothing, mode='same')
     return sentiment_features

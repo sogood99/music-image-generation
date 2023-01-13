@@ -1,39 +1,50 @@
-from utils.loaders.neural_translator_loader import *
+from utils.sound_sentiment import *
+from utils.neural_translator import NeuralSentimentTranslator
+from utils.diffusion_utils import *
+import matplotlib.pyplot as plt
+from os.path import join
+import argparse
+from pathlib import Path
 
 if __name__ == "__main__":
-    dataset_path = join(config['basedir'],
-                        'data/neural_translation_dataset.pickle')
-    with open(dataset_path, "rb") as f:
-        cond_vecs = pickle.load(f)
-        noise_vecs = pickle.load(f)
-        sent_vecs = pickle.load(f)
+    output_path = join(".", "outputs")
 
-    prompts = get_classes()
-    tokenizer = get_tokenizer()
-    text_encoder = get_text_encoder()
+    parser = argparse.ArgumentParser(description="Music to Video Generation")
 
-    prompts = [get_text_embeds(tokenizer, text_encoder, [
-                               p])[1].detach().cpu().numpy() for p in prompts]
-    print(prompts[0])
+    parser.add_argument("--song", type=Path,
+                        help="Song to use to generate", default=join(".", "data", "test1.wav"))
+    parser.add_argument("--video", type=Path,
+                        help="Output Video Path", default=join(output_path, "output.avi"))
+    parser.add_argument("--frames", type=int,
+                        help="Number of frames between", default=10)
+    parser.add_argument("--window_size", type=int,
+                        help="Window size of sampling", default=10)
+    parser.add_argument("--debug", type=bool,
+                        help="Show Debug Info", default=True)
+    args = parser.parse_args()
 
-    label = []
-    for j in range(len(cond_vecs)):
-        idx = -1
-        has = False
-        for i in range(len(prompts)):
-            b = (abs(cond_vecs[j] - prompts[i]) < 0.01).all()
-            if b:
-                idx = i
-                label.append(i)
-                if has:
-                    print("fuck")
-                has = True
-        if idx == -1:
-            print("jeez")
+    # 2 * window_size seconds, take mean of frames between samples => 2 * frames/window_size between different image types
+    fps = int(2 * args.frames/args.window_size)
 
-    print(label)
+    sound_sentiment = SoundSentimentExtractor()
+    attribute, x = sound_sentiment.extract_sentiment(
+        args.song, args.window_size)
+    neural_translator = NeuralSentimentTranslator()
+    class_vectors, song_words = neural_translator.translate_sentiment(
+        attribute)
+    if args.debug:
+        print(len(song_words))
+        print(song_words)
+        print(list(enumerate(song_words)))
+        print(len(attribute))
+        plt.plot(attribute[:, 0], label="valence")
+        plt.plot(attribute[:, 1], label="arousal")
+        plt.legend()
+        plt.show()
 
-    with open(dataset_path, "wb") as f:
-        pickle.dump(label, f, protocol=pickle.HIGHEST_PROTOCOL)
-        pickle.dump(noise_vecs, f, protocol=pickle.HIGHEST_PROTOCOL)
-        pickle.dump(sent_vecs, f, protocol=pickle.HIGHEST_PROTOCOL)
+    vae, unet, scheduler, tokenizer, text_encoder = get_vae(
+    ), get_unet(), get_scheduler(), get_tokenizer(), get_text_encoder()
+
+    images = generate_video(song_words, )
+    grid = image_grid(imgs=images, rows=len(images), col=args.frames)
+    grid.save(join(output_path, "grid.png"))

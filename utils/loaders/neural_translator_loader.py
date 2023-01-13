@@ -6,7 +6,7 @@ import torch
 from torchvision import transforms
 from tqdm import tqdm
 import numpy as np
-from utils.loaders.neural_translator_utils import get_gan_space_view, get_gan_space_view_from_ids, get_translator_data, get_classes
+from utils.loaders.neural_translator_utils import get_translator_data, get_classes
 from utils.diffusion_utils import *
 from utils.config import config
 from os.path import join
