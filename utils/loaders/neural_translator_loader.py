@@ -90,14 +90,7 @@ class DiffuserOnlineHelper(Dataset):
 
 def create_collection(epochs=1, dataset_path=join(config['basedir'], 'data/neural_translation_dataset.pickle')):
     """
-    Samples the GAN space and creates a dataset for training the translator
-    Note that the Online Translator can be also directly used for generating the dataset online.
-    However, caching the dataset allows for more easily conduncting experiments (since generating images using the GAN
-    is not cheap)
-
-    :param epochs: Number of generation epochs (in each epoch 1000 images (number of classes in ILSVRC) are generated)
-    :param dataset_path: path to save the generated dataset
-    :return:
+    Sample latent space of Stable Diffusion
     """
     s = DiffuserOnlineHelper(in_batch=5)
     cond_vecs, noise_vecs, sent_vecs = [], [], []
@@ -122,20 +115,10 @@ def create_collection(epochs=1, dataset_path=join(config['basedir'], 'data/neura
 class NeuralTranslatorLoader(Dataset):
 
     def __init__(self, dataset_path=join(config['basedir'], 'data/neural_translation_dataset.pickle'),
-                 train=False, deploy=True, n_clusters=10,
-                 seed=1, n_sub_classes=5, ids=None):
-
-        # if ids is not None:
-        #     cond_vecs, noise_vecs, sent_vecs = get_gan_space_view_from_ids(dataset_path=dataset_path, selected_ids=ids,
-        #                                                                    n_sub_classes=n_sub_classes)
-        # else:
-        #     cond_vecs, noise_vecs, sent_vecs = get_gan_space_view(dataset_path=dataset_path, n_sub_classes=n_sub_classes,
-        #                                                           n_clusters=n_clusters, seed=seed)
+                 train=False, deploy=True):
 
         cond_vecs, noise_vecs, sent_vecs = get_translator_data(
             dataset_path=dataset_path)
-
-        # print("Selected classes: ", np.unique(cond_vecs.argmax(1)))
 
         self.cond_vecs = cond_vecs
         self.noise_vecs = noise_vecs
@@ -143,7 +126,6 @@ class NeuralTranslatorLoader(Dataset):
 
         # Use the 80\% of the dataset of training
         thres = int(0.8 * len(self.cond_vecs))
-        print("Training samples = ", len(self.cond_vecs))
 
         if train and not deploy:
             self.cond_vecs = self.cond_vecs[:thres]
@@ -161,29 +143,26 @@ class NeuralTranslatorLoader(Dataset):
         # The valence-arousal is the input to the model
         data = torch.tensor(np.float32(self.sent_vecs[idx]))
 
-        # The corresponding GAN input that leads to the sentiment is the target
+        # The corresponding latent input that leads to the sentiment target
         target_cond = torch.tensor(np.float32(self.cond_vecs[idx]))
         target_noise = torch.tensor(np.float32(self.noise_vecs[idx]))
 
         return data, (target_cond, target_noise,)
 
 
-def get_train_loaders(batch_size=32, n_clusters=5, seed=1, n_sub_classes=5, ids=None):
-    train_dataset = NeuralTranslatorLoader(train=True, deploy=False, n_clusters=n_clusters, seed=seed,
-                                           n_sub_classes=n_sub_classes, ids=ids)
-    val_dataset = NeuralTranslatorLoader(train=False, deploy=False, n_clusters=n_clusters, seed=seed,
-                                         n_sub_classes=n_sub_classes, ids=ids)
+def get_train_loaders(batch_size=32):
+    train_dataset = NeuralTranslatorLoader(train=True, deploy=False)
+    val_dataset = NeuralTranslatorLoader(train=False, deploy=True)
 
     train_loader = torch.utils.data.DataLoader(
-        dataset=train_dataset, batch_size=batch_size, shuffle=False)
+        dataset=train_dataset, batch_size=batch_size)
     val_loader = torch.utils.data.DataLoader(
-        dataset=val_dataset, batch_size=batch_size, shuffle=False)
+        dataset=val_dataset, batch_size=batch_size)
     return train_loader, val_loader
 
 
-def get_deploy_loaders(batch_size=32, n_clusters=5, seed=1, n_sub_classes=5, ids=None):
-    train_dataset = NeuralTranslatorLoader(train=True, deploy=True, n_clusters=n_clusters, seed=seed,
-                                           n_sub_classes=n_sub_classes, ids=ids)
+def get_deploy_loaders(batch_size=32):
+    train_dataset = NeuralTranslatorLoader(train=True, deploy=True)
     train_loader = torch.utils.data.DataLoader(
         dataset=train_dataset, batch_size=batch_size, shuffle=True)
     return train_loader

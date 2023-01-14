@@ -1,5 +1,5 @@
 from utils.models import SoundMLP
-from utils.train_utils import train_model, eval_network, get_features
+from utils.train_utils import train_eval, train_model, eval_network, get_features
 from utils.loaders.deam_loader import get_train_loaders, get_deploy_loaders
 import numpy as np
 import torch
@@ -7,7 +7,6 @@ from utils.config import config
 
 
 def train_and_evaluate():
-    # Just for measure the performance of the sentiment analysis model
     net = SoundMLP()
     net.to(config['device'])
     train_loader, test_loader = get_train_loaders()
@@ -16,15 +15,12 @@ def train_and_evaluate():
 
 
 def train_deploy():
-    train_loader = get_deploy_loaders()
+    train_loader, test_loader = get_train_loaders()
 
     net = SoundMLP()
     net.to(config['device'])
 
-    train_model(net, train_loader, epochs=30, lr=0.0001)
-    eval_network(net, train_loader)
-    train_model(net, train_loader, epochs=20, lr=0.00001)
-    eval_network(net, train_loader)
+    train_eval(net, train_loader, test_loader, epochs=30, lr=0.0001)
 
     torch.save(net.state_dict(), "models/mlp.model")
 
