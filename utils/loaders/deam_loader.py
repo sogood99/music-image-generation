@@ -45,7 +45,7 @@ def get_train_loaders(batch_size=128, dataset_path="data/dataset.pickle"):
     train_dataset = SentimentDataset(
         train=True, deploy=False, dataset_path=dataset_path)
     val_dataset = SentimentDataset(
-        train=False, deploy=True, dataset_path=dataset_path)
+        train=False, deploy=False, dataset_path=dataset_path)
 
     train_loader = torch.utils.data.DataLoader(
         dataset=train_dataset, batch_size=batch_size, shuffle=True)

@@ -8,10 +8,14 @@ from torch.utils.tensorboard import SummaryWriter
 import os
 
 
-def train_eval(net, train_loader, test_loader, epochs=1, lr=0.001, train_type='sound', offset=0):
-    writer = SummaryWriter(os.path.join("outputs", "logdir", train_type))
+def train_eval(net, train_loader, test_loader, epochs=1, lr=0.001, train_type='sound', offset=0, tag=""):
+    writer = SummaryWriter(os.path.join("outputs", "logdir", train_type + tag))
     optimizer = optim.Adam(net.parameters(), lr=lr)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+    if train_type == 'translator':
+        scheduler = optim.lr_scheduler.StepLR(
+            optimizer, step_size=300, gamma=0.5)
+    else:
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min')
     net.train()
 
     for epoch in range(offset, offset+epochs):
@@ -59,16 +63,20 @@ def train_eval(net, train_loader, test_loader, epochs=1, lr=0.001, train_type='s
             writer.add_scalar("test/loss", test_loss, global_step=epoch)
             writer.add_scalar("test/acc", test_acc, global_step=epoch)
 
-        scheduler.step(total_loss/total_count)
+        if train_type == 'translator':
+            scheduler.step()
+        else:
+            scheduler.step(total_loss/total_count)
         print("Epoch {} loss = {}".format(epoch, total_loss / total_count))
     writer.close()
 
 
-def eval_network(net, test_loader,  train_type='sound'):
+def eval_network(net, test_loader, train_type='sound'):
     predictions = []
     eval_targets = []
     net.eval()
 
+    loss = 0
     for data, targets in test_loader:
         if train_type == 'sound':
             data = data.view((-1, data.size(2))).to(config['device'])
@@ -90,8 +98,8 @@ def eval_network(net, test_loader,  train_type='sound'):
         outputs = net(data)
 
         if train_type == 'translator':
-            criterion = torch.nn.CrossEntropyLoss(reduction="mean")
-            loss = criterion(outputs, cond_target).detach().cpu().numpy()
+            criterion = torch.nn.CrossEntropyLoss(reduction="sum")
+            loss += criterion(outputs, cond_target).detach().cpu().numpy()
             outputs = outputs.argmax(dim=1)
 
         predictions.append(outputs.detach().cpu().numpy())
@@ -102,6 +110,7 @@ def eval_network(net, test_loader,  train_type='sound'):
 
     if train_type == 'translator':
         acc = np.sum(predictions == eval_targets) / len(predictions)
+        loss /= len(predictions)
     else:
         loss = np.mean(np.sum((predictions - eval_targets) ** 2, axis=1))
 

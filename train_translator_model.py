@@ -24,24 +24,22 @@ def train_and_evaluate():
     eval_network(net, test_loader, train_type='translator')
 
 
-def train_deploy(seed=1):
+def train_deploy():
     train_loader, test_loader = get_train_loaders()
 
     net = NeuralTranslator()
     net.to(config['device'])
 
-    torch.manual_seed(seed)
-    train_eval(net, train_loader, test_loader, epochs=500,
+    train_eval(net, train_loader, test_loader, epochs=700,
                lr=0.001, train_type='translator')
-    torch.save(net.state_dict(), "models/neural_translator_" +
-               str(seed) + ".model")
+    torch.save(net.state_dict(), "models/neural_translator.model")
 
     net = NeuralTranslator()
     net.to(config['device'])
     net.load_state_dict(torch.load(
-        "models/neural_translator_" + str(seed) + ".model"))
+        "models/neural_translator.model"))
     eval_network(net, train_loader, train_type='translator')
 
 
 if __name__ == '__main__':
-    train_deploy(seed=0)
+    train_deploy()

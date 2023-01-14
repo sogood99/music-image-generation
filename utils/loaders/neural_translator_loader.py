@@ -124,8 +124,7 @@ class NeuralTranslatorLoader(Dataset):
         self.noise_vecs = noise_vecs
         self.sent_vecs = sent_vecs
 
-        # Use the 80\% of the dataset of training
-        thres = int(0.8 * len(self.cond_vecs))
+        thres = int(1.0 * len(self.cond_vecs))
 
         if train and not deploy:
             self.cond_vecs = self.cond_vecs[:thres]
@@ -152,7 +151,7 @@ class NeuralTranslatorLoader(Dataset):
 
 def get_train_loaders(batch_size=32):
     train_dataset = NeuralTranslatorLoader(train=True, deploy=False)
-    val_dataset = NeuralTranslatorLoader(train=False, deploy=True)
+    val_dataset = NeuralTranslatorLoader(train=False, deploy=False)
 
     train_loader = torch.utils.data.DataLoader(
         dataset=train_dataset, batch_size=batch_size)

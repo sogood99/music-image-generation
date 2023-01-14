@@ -92,7 +92,7 @@ def get_oasis_dataset_loaders(batch_size=32):
     train_dataset = OASIS_Loader(
         train=True, deploy=False, transform=cur_transforms)
     test_dataset = OASIS_Loader(
-        train=False, deploy=True, transform=cur_transforms)
+        train=False, deploy=False, transform=cur_transforms)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True)
