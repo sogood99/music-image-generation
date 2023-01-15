@@ -223,7 +223,7 @@ def images_to_video(images, fps, output_path):
     frame_size = (h, w)
 
     out = cv2.VideoWriter(output_path,
-                          cv2.VideoWriter_fourcc(*"DIVX"), 15, frame_size)
+                          cv2.VideoWriter_fourcc(*"DIVX"), fps, frame_size)
 
     for img in images:
         new_img = np.array(img)

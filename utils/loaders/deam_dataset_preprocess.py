@@ -4,7 +4,6 @@ import numpy as np
 from tqdm import tqdm
 from utils.sound_features import extract_features_from_file
 import pickle
-import multiprocessing
 
 anotations_path = './data/deam/annotations/annotations averaged per song/dynamic (per second annotations)'
 songs_path = './data/deam/audio'

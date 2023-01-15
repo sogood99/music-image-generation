@@ -13,7 +13,7 @@ from torchvision import transforms, utils
 from PIL import Image
 
 
-def load_annotations(path='./data/oasis'):
+def load_annotations(path=join('data', 'oasis')):
     """
     Loads the OASIS annotations (per audio file)
     :param path:
@@ -40,7 +40,7 @@ def load_annotations(path='./data/oasis'):
 
 class OASIS_Loader(Dataset):
 
-    def __init__(self, dataset_path='./data/oasis', transform=None, deploy=False, train=False):
+    def __init__(self, dataset_path=join('data', 'oasis'), transform=None, deploy=False, train=False):
         self.transform = transform
 
         filepaths, labels = load_annotations(dataset_path)

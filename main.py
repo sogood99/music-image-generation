@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from os.path import join
 import argparse
 from pathlib import Path
+import subprocess
 
 if __name__ == "__main__":
     output_path = join(".", "outputs")
@@ -45,6 +46,6 @@ if __name__ == "__main__":
     vae, unet, scheduler, tokenizer, text_encoder = get_vae(
     ), get_unet(), get_scheduler(), get_tokenizer(), get_text_encoder()
 
-    images = generate_video(song_words, )
-    grid = image_grid(imgs=images, rows=len(images), col=args.frames)
-    grid.save(join(output_path, "grid.png"))
+    images = generate_video(song_words, unet, scheduler,
+                            vae, tokenizer, text_encoder, args.frames)
+    images_to_video(images, fps, args.video)
